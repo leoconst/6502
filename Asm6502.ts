@@ -1,11 +1,22 @@
 enum Opcodes {
 	BREAK = 0x00,
+	CLEAR_CARRY = 0x18,
 	JUMP_ABSOLUTE = 0x4C,
+	ADD_WITH_CARRY_IMMEDIATE = 0x69,
+	STORE_ACCUMULATOR_ZERO_PAGE = 0x85,
+	DECREMENT_Y = 0x88,
 	STORE_ACCUMULATOR_ABSOLUTE = 0x8D,
+	STORE_ACCUMULATOR_INDIRECT_Y_INDEXED = 0x91,
+	TRANSFER_Y_TO_ACCUMULATOR = 0x98,
 	STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED = 0x99,
 	LOAD_Y_IMMEDIATE = 0xA0,
+	LOAD_ACCUMULATOR_ZERO_PAGE = 0xA5,
+	TRANSFER_ACCUMULATOR_TO_Y = 0xA8,
 	LOAD_ACCUMULATOR_IMMEDIATE = 0xA9,
 	INCREMENT_Y = 0xC8,
+	COMPARE_IMMEDIATE = 0xC9,
+	INCREMENT_ZERO_PAGE = 0xE6,
+	BRANCH_IF_EQUAL = 0xF0,
 }
 
 class Processor {
@@ -14,6 +25,9 @@ class Processor {
 	accumulator: number = 0
 	x_register: number = 0
 	y_register: number = 0
+
+	zero: boolean = false
+	carry: boolean = false
 
 	program_counter = 0x0600
 
@@ -30,11 +44,33 @@ class Processor {
 		switch (op_code) {
 		case Opcodes.BREAK:
 			return false
+		case Opcodes.CLEAR_CARRY:
+			this.carry = false
+			break
 		case Opcodes.JUMP_ABSOLUTE:
 			this.program_counter = this._16_bit(this._next(), this._next())
 			break
+		case Opcodes.ADD_WITH_CARRY_IMMEDIATE:
+			this._add_with_carry(this._next())
+			break
+		case Opcodes.STORE_ACCUMULATOR_ZERO_PAGE:
+			this._store(this.accumulator, this._next(), 0)
+			break
+		case Opcodes.DECREMENT_Y:
+			this.y_register = this._clamp_byte(this.y_register - 1)
+			break
 		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE:
 			this._store(this.accumulator, this._next(), this._next())
+			break
+		case Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED:
+			const lo_address = this._next()
+			const hi_address = lo_address + 1
+			const lo = this.memory[lo_address]
+			const hi = this.memory[hi_address]
+			this.memory[this._16_bit(lo, hi) + this.y_register] = this.accumulator
+			break
+		case Opcodes.TRANSFER_Y_TO_ACCUMULATOR:
+			this.accumulator = this.y_register
 			break
 		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED:
 			this._store(this.accumulator, this.y_register, this._next())
@@ -42,13 +78,30 @@ class Processor {
 		case Opcodes.LOAD_Y_IMMEDIATE:
 			this.y_register = this._next()
 			break
+		case Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE:
+			this.accumulator = this.memory[this._next()]
+			break
+		case Opcodes.TRANSFER_ACCUMULATOR_TO_Y:
+			this.y_register = this.accumulator
+			break
 		case Opcodes.LOAD_ACCUMULATOR_IMMEDIATE:
 			this.accumulator = this._next()
 			break
 		case Opcodes.INCREMENT_Y:
-			this.y_register = this.y_register == 255
-				? 0
-				: this.y_register + 1
+			this.y_register = this._clamp_byte(this.y_register + 1)
+			break
+		case Opcodes.COMPARE_IMMEDIATE:
+			this.zero = this.accumulator == this._next()
+			break
+		case Opcodes.INCREMENT_ZERO_PAGE:
+			const address = this._next()
+			this.memory[address] = this._clamp_byte(this.memory[address] + 1)
+			break
+		case Opcodes.BRANCH_IF_EQUAL:
+			const relative_jump = this._next()
+			if (this.zero) {
+				this.program_counter += this._twos_compliment(relative_jump) + 1
+			}
 			break
 		default:
 			throw new Error(`Unknown opcode (${_hex(op_code)}), terminating program.`)
@@ -57,12 +110,35 @@ class Processor {
 		return true
 	}
 
+	_add_with_carry(value: number) {
+		const result = this.accumulator + value + this._boolean_to_integer(this.carry)
+		const clamped = this._clamp_byte(result)
+		this.carry = result != clamped
+		this.accumulator = clamped
+	}
+
+	_clamp_byte(value: number) {
+		return value & 0xFF
+	}
+
 	_store(value: number, lo: number, hi: number) {
 		this.memory[this._16_bit(lo, hi)] = value
 	}
 
+	_boolean_to_integer(value: boolean) {
+		return value
+			? 1
+			: 0
+	}
+
 	_16_bit(lo: number, hi: number) {
 		return (hi * 0x100) + lo
+	}
+
+	_twos_compliment(value: number) {
+		return value > 0x7F
+			? -0x100 + value
+			: value
 	}
 
 	_next() {
@@ -86,20 +162,83 @@ class UI {
 	_frame_time_length_ms: number = (1000 / 60)
 
 	load_program() {
+		// define row_lo $00
+		// define row_hi $01
+		// define colour $02
+
+		// define screen_start $02
+		// define screen_end $06
+
+		// LDA #$00
+		// STA row_lo
+		// STA colour
+
+		// start:
+		// CLC
+		// LDY #$00
+		// INC colour
+		// LDA #screen_start
+		// STA row_hi
+
+		// draw:
+		// LDA colour
+		// STA (row_lo),Y
+		// TYA
+		// ADC #$01
+		// TAY
+		// LDA row_hi
+		// ADC #$00
+		// CMP #screen_end
+		// BEQ start
+		// STA row_hi
+
+		// JMP draw
+
+		const row_lo = 0x00
+		const row_hi = 0x01
+		const colour = 0x02
+
+		const screen_start = 0x02
+		const screen_end = 0x06
+
 		const program = new Uint8Array([
+			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
+			0x00,
+			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			row_lo,
+			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			colour,
+			// start:
+			Opcodes.CLEAR_CARRY,
 			Opcodes.LOAD_Y_IMMEDIATE,
 			0x00,
+			Opcodes.INCREMENT_ZERO_PAGE,
+			colour,
 			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
+			screen_start,
+			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			row_hi,
+			// draw:
+			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
+			colour,
+			Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED,
+			row_lo,
+			Opcodes.TRANSFER_Y_TO_ACCUMULATOR,
+			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
+			0x01,
+			Opcodes.TRANSFER_ACCUMULATOR_TO_Y,
+			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
+			row_hi,
+			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
 			0x00,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED,
-			0x02,
-			Opcodes.INCREMENT_Y,
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0x03,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED,
-			0x02,
+			Opcodes.COMPARE_IMMEDIATE,
+			screen_end,
+			Opcodes.BRANCH_IF_EQUAL,
+			0x100 - 25,
+			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			row_hi,
 			Opcodes.JUMP_ABSOLUTE,
-			0x02,
+			0x0F,
 			0x06,
 		])
 		this._processor.load_program(program)
