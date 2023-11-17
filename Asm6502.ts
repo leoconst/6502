@@ -20,14 +20,13 @@ enum Opcodes {
 }
 
 class Processor {
-	memory: Uint8Array = new Uint8Array(0x10000)
+	readonly memory: Uint8Array = new Uint8Array(0x10000)
 
-	accumulator: number = 0
-	x_register: number = 0
-	y_register: number = 0
+	readonly status: Status = new Status()
 
-	zero: boolean = false
-	carry: boolean = false
+	readonly accumulator: Register = new Register(this.status)
+	readonly x: Register = new Register(this.status)
+	readonly y: Register = new Register(this.status)
 
 	program_counter = 0x0600
 
@@ -45,63 +44,56 @@ class Processor {
 		case Opcodes.BREAK:
 			return false
 		case Opcodes.CLEAR_CARRY:
-			this.carry = false
+			this.status.carry = false
 			break
 		case Opcodes.JUMP_ABSOLUTE:
-			this.program_counter = this._16_bit(this._next(), this._next())
+			this.program_counter = this._absolute_address()
 			break
 		case Opcodes.ADD_WITH_CARRY_IMMEDIATE:
 			this._add_with_carry(this._next())
 			break
 		case Opcodes.STORE_ACCUMULATOR_ZERO_PAGE:
-			this._store(this.accumulator, this._next(), 0)
+			this._store(this.accumulator, this._zero_page_address())
 			break
 		case Opcodes.DECREMENT_Y:
-			this.y_register = this._clamp_byte(this.y_register - 1)
+			this._decrement_register(this.y)
 			break
 		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE:
-			this._store(this.accumulator, this._next(), this._next())
+			this._store(this.accumulator, this._absolute_address())
 			break
 		case Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED:
-			const lo_address = this._next()
-			const hi_address = lo_address + 1
-			const lo = this.memory[lo_address]
-			const hi = this.memory[hi_address]
-			this.memory[this._16_bit(lo, hi) + this.y_register] = this.accumulator
+			this._store(this.accumulator, this._indirect_y_indexed_address())
 			break
 		case Opcodes.TRANSFER_Y_TO_ACCUMULATOR:
-			this.accumulator = this.y_register
+			this._transfer(this.y, this.accumulator)
 			break
 		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED:
-			this._store(this.accumulator, this.y_register, this._next())
+			this._store(this.accumulator, this._absolute_y_indexed_address())
 			break
 		case Opcodes.LOAD_Y_IMMEDIATE:
-			this.y_register = this._next()
+			this._load_immediate(this.y)
 			break
 		case Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE:
-			this.accumulator = this.memory[this._next()]
+			this._load_from_address(this.accumulator, this._zero_page_address())
 			break
 		case Opcodes.TRANSFER_ACCUMULATOR_TO_Y:
-			this.y_register = this.accumulator
+			this._transfer(this.accumulator, this.y)
 			break
 		case Opcodes.LOAD_ACCUMULATOR_IMMEDIATE:
-			this.accumulator = this._next()
+			this._load_immediate(this.accumulator)
 			break
 		case Opcodes.INCREMENT_Y:
-			this.y_register = this._clamp_byte(this.y_register + 1)
+			this._increment_register(this.y)
 			break
 		case Opcodes.COMPARE_IMMEDIATE:
-			this.zero = this.accumulator == this._next()
+			// TODO: Set all relevant status flags
+			this.status.zero = this.accumulator.getValue() == this._next()
 			break
 		case Opcodes.INCREMENT_ZERO_PAGE:
-			const address = this._next()
-			this.memory[address] = this._clamp_byte(this.memory[address] + 1)
+			this._increment_memory(this._zero_page_address())
 			break
 		case Opcodes.BRANCH_IF_EQUAL:
-			const relative_jump = this._next()
-			if (this.zero) {
-				this.program_counter += this._twos_compliment(relative_jump) + 1
-			}
+			this._branch_if(this.status.zero)
 			break
 		default:
 			throw new Error(`Unknown opcode (${_hex(op_code)}), terminating program.`)
@@ -111,18 +103,11 @@ class Processor {
 	}
 
 	_add_with_carry(value: number) {
-		const result = this.accumulator + value + this._boolean_to_integer(this.carry)
-		const clamped = this._clamp_byte(result)
-		this.carry = result != clamped
-		this.accumulator = clamped
-	}
-
-	_clamp_byte(value: number) {
-		return value & 0xFF
-	}
-
-	_store(value: number, lo: number, hi: number) {
-		this.memory[this._16_bit(lo, hi)] = value
+		const sum = this.accumulator.getValue()
+			+ value
+			+ this._boolean_to_integer(this.status.carry)
+		this.status.carry = sum > 0xFF
+		this.accumulator.set(sum)
 	}
 
 	_boolean_to_integer(value: boolean) {
@@ -131,8 +116,11 @@ class Processor {
 			: 0
 	}
 
-	_16_bit(lo: number, hi: number) {
-		return (hi * 0x100) + lo
+	_branch_if(condition: boolean) {
+		const relative_jump = this._next()
+		if (condition) {
+			this.program_counter += this._twos_compliment(relative_jump) + 1
+		}
 	}
 
 	_twos_compliment(value: number) {
@@ -141,11 +129,98 @@ class Processor {
 			: value
 	}
 
+	_increment_register(register: Register) {
+		register.set(register.getValue() + 1)
+	}
+
+	_decrement_register(register: Register) {
+		register.set(register.getValue() - 1)
+	}
+
+	_increment_memory(address: number) {
+		this.memory[address] += 1
+	}
+
+	_load_immediate(register: Register) {
+		register.set(this._next())
+	}
+
+	_load_from_address(register: Register, address: number) {
+		register.set(this.memory[address])
+	}
+
+	_store(register: Register, address: number) {
+		this.memory[address] = register.getValue()
+	}
+
+	_transfer(from: Register, to: Register) {
+		to.set(from.getValue())
+	}
+
+	_zero_page_address() {
+		return this._next()
+	}
+
+	_absolute_address() {
+		const lo = this._next()
+		const hi = this._next()
+		return this._16_bit(lo, hi)
+	}
+
+	_absolute_y_indexed_address() {
+		return this._absolute_address() + this.y.getValue()
+	}
+
+	_indirect_y_indexed_address() {
+		const lo_address = this._next()
+		const hi_address = lo_address + 1
+		const lo = this.memory[lo_address]
+		const hi = this.memory[hi_address]
+		return this._16_bit(lo, hi) + this.y.getValue()
+	}
+
+	_16_bit(lo: number, hi: number) {
+		return (hi * 0x100) + lo
+	}
+
 	_next() {
 		const value = this.memory[this.program_counter]
 		this.program_counter += 1
 		return value
 	}
+}
+
+class Register {
+	readonly _status: Status
+
+	_value: number = 0
+
+	constructor(status: Status) {
+		this._status = status
+	}
+
+	getValue() {
+		return this._value
+	}
+
+	set(value: number) {
+		const clamped = this._clamp_byte(value)
+
+		this._status.negative = clamped > 0x7F
+		this._status.zero = clamped == 0
+
+		this._value = clamped
+	}
+
+	_clamp_byte(value: number) {
+		return value & 0xFF
+	}
+}
+
+class Status {
+	negative: boolean = false
+	zero: boolean = false
+	carry: boolean = false
 }
 
 class UI {
