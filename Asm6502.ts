@@ -73,44 +73,16 @@ class Processor {
 }
 
 class UI {
-	_processor = new Processor()
+	_processor: Processor = new Processor()
 
-	_screen_memory_offset = 0x200
-	_screen_width = 32
-	_screen_height = 32
-	_screen: HTMLElement = this._getRequiredElementById("Screen")
-	_screen_pixels: Array<HTMLElement> = []
+	_screen_memory_offset: number = 0x200
+	_screen_width: number = 32
+	_screen_height: number = 32
+	_screen = document.getElementById("Screen") as HTMLCanvasElement ?? _throwForNull()
+	_screen_context: CanvasRenderingContext2D = this._screen.getContext("2d") ?? _throwForNull()
 
-	_console: HTMLElement = this._getRequiredElementById("Console")
+	_console: HTMLElement = document.getElementById("Console") ?? _throwForNull()
 
-	constructor() {
-		this._make_screen()
-	}
-
-	_getRequiredElementById(id: string) {
-		const element = document.getElementById(id)
-		if (element == null) {
-			throw new Error(`Could not find ${id} element`)
-		}
-		return element
-	}
-
-	_make_screen() {
-		for (var y = 0; y < this._screen_height; ++y) {
-			for (var x = 0; x < this._screen_width; ++x) {
-				var pixel = document.createElement("div")
-				pixel.style.width = "10px";
-				pixel.style.height = "10px";
-				pixel.style.backgroundColor = "black"
-				pixel.style.display = "inline-block"
-				this._screen.appendChild(pixel)
-				this._screen_pixels.push(pixel)
-			}
-			this._screen.appendChild(document.createElement("br"))
-		}
-	}
-
-			
 	load_program() {
 		const program = new Uint8Array([
 			Opcodes.LOAD_Y_IMMEDIATE,
@@ -153,11 +125,26 @@ class UI {
 	}
 
 	_redraw_screen() {
+		const canvas_width = this._screen.width
+		const canvas_height = this._screen.height
+
+		const cell_width = canvas_width / this._screen_height
+		const cell_height = canvas_height / this._screen_height
+
+		const context = this._screen_context
 		const memory = this._processor.memory
-		for (var i = 0; i < (256 * 4); ++i) {
-			const pixel = this._screen_pixels[i]
-			const value = memory[this._screen_memory_offset + i]
-			pixel.style.backgroundColor = this._value_to_colour(value)
+
+		var screen_pointer = this._screen_memory_offset
+
+		for (var y_index = 0; y_index < this._screen_height; ++y_index) {
+			const y_position = y_index*cell_height
+			for (var x_index = 0; x_index < this._screen_width; ++x_index) {
+				const value = memory[screen_pointer]
+				const x_position = x_index*cell_width
+				context.fillStyle = this._value_to_colour(value)
+				context.fillRect(x_position, y_position, cell_width, cell_height)
+				screen_pointer += 1
+			}
 		}
 	}
 
@@ -182,7 +169,7 @@ class UI {
 
 	_value_to_colour(value: number) {
 		const index = (value & 0x0F)
-		return this._colours[index]
+		return "#" + this._colours[index]
 	}
 
 	_append_console(output: string) {
@@ -196,6 +183,10 @@ function _hex(number: number) {
 		? raw
 		: '0' + raw
 	return "$" + padded
+}
+
+function _throwForNull(): never {
+	throw new Error("Unexpected null")
 }
 
 
