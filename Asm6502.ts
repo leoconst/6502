@@ -83,6 +83,8 @@ class UI {
 
 	_console: HTMLElement = document.getElementById("Console") ?? _throwForNull()
 
+	_frame_time_length_ms: number = (1000 / 60)
+
 	load_program() {
 		const program = new Uint8Array([
 			Opcodes.LOAD_Y_IMMEDIATE,
@@ -105,22 +107,29 @@ class UI {
 
 	run() {
 		var proceed = false
+		var now = performance.now()
+		var next_frame_time = now - (now % this._frame_time_length_ms) + this._frame_time_length_ms
 
-		try {
-			proceed = this._processor.advance()
-		}
-		catch (error: any) {
-			this._append_console(error.message)
-			return
-		}
+		while (true) {
+			try {
+				proceed = this._processor.advance()
+			}
+			catch (error: any) {
+				this._append_console(error.message)
+				return
+			}
 
-		this._redraw_screen()
+			this._redraw_screen()
 
-		if (proceed) {
-			setTimeout(() => this.run(), 1)
-		}
-		else {
-			this._append_console("Done.")
+			if (!proceed) {
+				this._append_console("Done")
+				return
+			}
+
+			if (performance.now() > next_frame_time) {
+				setTimeout(() => this.run(), 0)
+				return
+			}
 		}
 	}
 
