@@ -1,7 +1,11 @@
 enum Opcodes {
-	BREAK = 0,
+	BREAK = 0x00,
+	JUMP_ABSOLUTE = 0x4C,
 	STORE_ACCUMULATOR_ABSOLUTE = 0x8C,
+	STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED = 0x99,
+	LOAD_Y_IMMEDIATE = 0xA0,
 	LOAD_ACCUMULATOR_IMMEDIATE = 0xA9,
+	INCREMENT_Y = 0xC8,
 }
 
 class Processor {
@@ -26,19 +30,39 @@ class Processor {
 		switch (op_code) {
 		case Opcodes.BREAK:
 			return false
+		case Opcodes.JUMP_ABSOLUTE:
+			this.program_counter = this._16_bit(this._next(), this._next())
+			break
+		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE:
+			this._store(this.accumulator, this._next(), this._next())
+			break
+		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED:
+			this._store(this.accumulator, this.y_register, this._next())
+			break
+		case Opcodes.LOAD_Y_IMMEDIATE:
+			this.y_register = this._next()
+			break
 		case Opcodes.LOAD_ACCUMULATOR_IMMEDIATE:
 			this.accumulator = this._next()
 			break
-		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE:
-			const address_lo = this._next()
-			const address_hi = this._next()
-			this.memory[(address_hi * 0x100) + address_lo] = this.accumulator
+		case Opcodes.INCREMENT_Y:
+			this.y_register = this.y_register == 255
+				? 0
+				: this.y_register + 1
 			break
 		default:
 			throw new Error(`Unknown opcode (${_hex(op_code)}), terminating program.`)
 		}
 
 		return true
+	}
+
+	_store = function(value, lo, hi) {
+		this.memory[this._16_bit(lo, hi)] = value
+	}
+
+	_16_bit = function(lo, hi) {
+		return (hi * 0x100) + lo
 	}
 
 	_next = function() {
@@ -78,45 +102,23 @@ class UI {
 		}
 	}
 
+			
 	load_program = function() {
 		const program = new Uint8Array([
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0x01,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
+			Opcodes.LOAD_Y_IMMEDIATE,
 			0x00,
-			0x02,
 			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
+			0x00,
+			Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED,
 			0x02,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
-			0x01,
-			0x02,
+			Opcodes.INCREMENT_Y,
 			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
 			0x03,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
+			Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED,
 			0x02,
+			Opcodes.JUMP_ABSOLUTE,
 			0x02,
-
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0x04,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
-			0x04,
-			0x02,
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0x05,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
-			0x05,
-			0x02,
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
 			0x06,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
-			0x06,
-			0x02,
-
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0xFE,
-			Opcodes.STORE_ACCUMULATOR_ABSOLUTE,
-			0xFF,
-			0x05,
 		])
 		this._processor.load_program(program)
 	}
@@ -179,7 +181,7 @@ function _run_loop(ui: UI) {
 	if (proceed) {
 		setTimeout(function () {
 			_run_loop(ui)
-		}, 100)
+		}, 1)
 	}
 	else {
 		ui._append_console("Done.")
