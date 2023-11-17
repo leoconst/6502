@@ -11,20 +11,20 @@ enum Opcodes {
 class Processor {
 	memory: Uint8Array = new Uint8Array(0x10000)
 
-	accumulator: Number = 0
-	x_register: Number = 0
-	y_register: Number = 0
+	accumulator: number = 0
+	x_register: number = 0
+	y_register: number = 0
 
 	program_counter = 0x0600
 
-	load_program = function(program: Uint8Array) {
+	load_program(program: Uint8Array) {
 		const program_start = this.program_counter
 		for (var index = 0; index < program.length; ++index) {
 			this.memory[program_start + index] = program[index]
 		}
 	}
 
-	advance = function() {
+	advance() {
 		const op_code = this._next()
 
 		switch (op_code) {
@@ -57,15 +57,15 @@ class Processor {
 		return true
 	}
 
-	_store = function(value, lo, hi) {
+	_store(value: number, lo: number, hi: number) {
 		this.memory[this._16_bit(lo, hi)] = value
 	}
 
-	_16_bit = function(lo, hi) {
+	_16_bit(lo: number, hi: number) {
 		return (hi * 0x100) + lo
 	}
 
-	_next = function() {
+	_next() {
 		const value = this.memory[this.program_counter]
 		this.program_counter += 1
 		return value
@@ -78,16 +78,24 @@ class UI {
 	_screen_memory_offset = 0x200
 	_screen_width = 32
 	_screen_height = 32
-	_screen = document.getElementById("Screen")
+	_screen: HTMLElement = this._getRequiredElementById("Screen")
 	_screen_pixels: Array<HTMLElement> = []
 
-	_console = document.getElementById("Console")
+	_console: HTMLElement = this._getRequiredElementById("Console")
 
 	constructor() {
 		this._make_screen()
 	}
 
-	_make_screen = function() {
+	_getRequiredElementById(id: string) {
+		const element = document.getElementById(id)
+		if (element == null) {
+			throw new Error(`Could not find ${id} element`)
+		}
+		return element
+	}
+
+	_make_screen() {
 		for (var y = 0; y < this._screen_height; ++y) {
 			for (var x = 0; x < this._screen_width; ++x) {
 				var pixel = document.createElement("div")
@@ -103,7 +111,7 @@ class UI {
 	}
 
 			
-	load_program = function() {
+	load_program() {
 		const program = new Uint8Array([
 			Opcodes.LOAD_Y_IMMEDIATE,
 			0x00,
@@ -123,11 +131,28 @@ class UI {
 		this._processor.load_program(program)
 	}
 
-	run = function () {
-		_run_loop(this)
+	run() {
+		var proceed = false
+
+		try {
+			proceed = this._processor.advance()
+		}
+		catch (error: any) {
+			this._append_console(error.message)
+			return
+		}
+
+		this._redraw_screen()
+
+		if (proceed) {
+			setTimeout(() => this.run(), 1)
+		}
+		else {
+			this._append_console("Done.")
+		}
 	}
 
-	_redraw_screen = function() {
+	_redraw_screen() {
 		const memory = this._processor.memory
 		for (var i = 0; i < (256 * 4); ++i) {
 			const pixel = this._screen_pixels[i]
@@ -160,31 +185,8 @@ class UI {
 		return this._colours[index]
 	}
 
-	_append_console = function(output: string) {
+	_append_console(output: string) {
 		this._console.innerHTML += output + "\n"
-	}
-}
-
-function _run_loop(ui: UI) {
-	var proceed = false
-
-	try {
-		proceed = ui._processor.advance()
-	}
-	catch (error) {
-		ui._append_console(error.message)
-		return
-	}
-
-	ui._redraw_screen()
-
-	if (proceed) {
-		setTimeout(function () {
-			_run_loop(ui)
-		}, 1)
-	}
-	else {
-		ui._append_console("Done.")
 	}
 }
 
