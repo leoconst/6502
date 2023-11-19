@@ -9,13 +9,15 @@ export class Processor {
 	readonly x: Register = new Register(this.status)
 	readonly y: Register = new Register(this.status)
 
-	program_counter = 0x0600
+	program_counter = 0
 
-	load_program(program: Uint8Array) {
-		const program_start = this.program_counter
-		for (var index = 0; index < program.length; ++index) {
-			this.memory[program_start + index] = program[index]
-		}
+	load_program(program: Uint8Array, program_start: number) {
+		this.memory.set(program, program_start)
+		this.program_counter = program_start
+	}
+
+	reset() {
+		this.memory.fill(0)
 	}
 
 	advance() {

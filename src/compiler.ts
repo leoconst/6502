@@ -13,8 +13,8 @@ export function compile(source: string, program_start: number) {
 	return new Uint8Array(program)
 }
 
-function _line_to_opcodes({text, index}: {text: string, index: number}, state: State) {
-	const line = new Line(text, index)
+function _line_to_opcodes(raw_line: RawLine, state: State) {
+	const line = new Line(raw_line)
 
 	const opcodes = _get_opcodes(line, state)
 
@@ -55,8 +55,10 @@ function _get_opcodes(line: Line, state: State) {
 	}
 	if (first_word === "BEQ") {
 		const target_address = _get_label_address(line, state)
-		const address_diff = state.get_program_pointer() - target_address
-		const signed_relative_jump_byte = 0x100 - (2 + address_diff)
+		const execution_length = 2
+		const address_after_execution = state.get_program_pointer() + execution_length
+		const address_diff = target_address - address_after_execution
+		const signed_relative_jump_byte = _to_twos_compliment(address_diff)
 		return [Opcode.BRANCH_IF_EQUAL, signed_relative_jump_byte]
 	}
 	if (first_word === "LDA") {
@@ -89,10 +91,17 @@ function _get_opcodes(line: Line, state: State) {
 	throw line.error("Unknown operator")
 }
 
+function _to_twos_compliment(value: number) {
+	return value < 0
+		? 0x100 + value
+		: value
+}
+
 const _singletons = new Map<string, Opcode>([
 	["CLC", Opcode.CLEAR_CARRY],
 	["TAY", Opcode.TRANSFER_ACCUMULATOR_TO_Y],
 	["TYA", Opcode.TRANSFER_Y_TO_ACCUMULATOR],
+	["INY", Opcode.INCREMENT_Y]
 ])
 
 function _get_label_address(line: Line, state: State) {
@@ -187,16 +196,16 @@ class State {
 }
 
 class Line {
-	readonly _line_text
-	readonly _line_index
+	readonly _text
+	readonly _index
 	readonly _words
 
 	_word_index = 0
 
-	constructor(line_text: string, line_index: number) {
-		this._line_text = line_text
-		this._line_index = line_index
-		this._words = line_text
+	constructor(raw_line: RawLine) {
+		this._text = raw_line.text
+		this._index = raw_line.index
+		this._words = this._text
 			.split(' ')
 			.map(part => part.trim())
 	}
@@ -218,8 +227,8 @@ class Line {
 	}
 
 	error(message: string) {
-		const line_number = this._line_index + 1
-		return new Error(`${message} on line ${line_number}:\n${this._line_text}`)
+		const line_number = this._index + 1
+		return new Error(`${message} on line ${line_number}:\n${this._text}`)
 	}
 }
 
@@ -241,4 +250,9 @@ function match_group_1(string: string, regex: RegExp) {
 	}
 
 	return group_1
+}
+
+interface RawLine {
+	text: string,
+	index: number,
 }

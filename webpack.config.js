@@ -1,9 +1,21 @@
-var path = require('path');
+const path = require('path');
 
 module.exports = {
-  entry: './src/app.js',
+  entry: './src/app.ts',
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        use: 'ts-loader',
+        exclude: /node_modules/,
+      },
+    ],
+  },
+  resolve: {
+    extensions: ['.tsx', '.ts', '.js'],
+  },
   output: {
-    path: path.resolve(__dirname),
-    filename: './src/_bundle.js'
-  }
+    filename: '_bundle.js',
+    path: path.resolve(__dirname, 'dist'),
+  },
 };

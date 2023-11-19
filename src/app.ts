@@ -2,56 +2,76 @@ import { Processor } from './processor'
 import { compile } from './compiler'
 
 class UI {
-	_processor: Processor = new Processor()
+	readonly _processor = new Processor()
+	readonly _program_start_address = 0x06_00
 
-	_screen_memory_offset: number = 0x200
-	_screen_width: number = 32
-	_screen_height: number = 32
-	_screen = document.getElementById("Screen") as HTMLCanvasElement ?? _throwForNull()
-	_screen_context: CanvasRenderingContext2D = this._screen.getContext("2d") ?? _throwForNull()
+	readonly _screen_memory_offset = 0x200
+	readonly _screen_width = 32
+	readonly _screen_height = 32
+	readonly _screen = this._get_element("Screen") as HTMLCanvasElement
+	readonly _screen_context = this._get_2d_context(this._screen)
 
-	_console = document.getElementById("Console") as HTMLTextAreaElement ?? _throwForNull()
+	readonly _console = this._get_element("Console") as HTMLTextAreaElement
 
-	_editor = document.getElementById("Editor") as HTMLTextAreaElement ?? _throwForNull()
+	readonly _editor = this._get_element("Editor") as HTMLTextAreaElement
 
-	_compile = document.getElementById("Compile") as HTMLButtonElement ?? _throwForNull()
-	_run = document.getElementById("Run") as HTMLButtonElement ?? _throwForNull()
-	_stop = document.getElementById("Stop") as HTMLButtonElement ?? _throwForNull()
+	readonly _compile = this._get_element("Compile") as HTMLButtonElement
+	readonly _play_pause = this._get_element("PlayPause") as HTMLButtonElement
 
-	_frame_time_length_ms: number = (1000 / 60)
+	readonly _frame_time_length_ms: number = (1000 / 60)
 
 	_running = false
 
 	constructor() {
 		this._compile.onclick = () => this._on_compile()
-		this._run.onclick = () => this._on_run()
-		this._stop.onclick = () => this._on_stop()
+		this._play_pause.onclick = () => this._on_start_stop()
 		this._set_running(false)
+		this._redraw_screen()
 	}
 
 	set_source(source: string) {		
 		this._editor.value = source
 	}
 
+	_get_element(id: string) {
+		return document.getElementById(id) ?? _throwForNull()
+	}
+
+	_get_2d_context(canvas: HTMLCanvasElement) {
+		return canvas.getContext("2d") ?? _throwForNull()
+	}
+
 	_on_compile() {
 		const source = this._editor.value
 
 		try {
-			const program = compile(source, this._processor.program_counter)
-			this._processor.load_program(program)
+			this._processor.reset()
+
+			const program = compile(source, this._program_start_address)
+			this._processor.load_program(program, this._program_start_address)
+
+			this._append_console(`Compiled ${program.length} bytes`)
 		}
 		catch (error: any) {
 			this._append_console(error.message)
-			return
 		}
 
-		this._append_console("Compiled")
+		this._redraw_screen()
 	}
 
-	_on_run() {
-		this._append_console("Running...")
-		this._set_running(true)
-		this._run_in_loop()
+	_on_start_stop() {
+		const running = !this._running
+
+		this._set_running(running)
+
+		const message = running
+			? "Running..."
+			: "Paused"
+		this._append_console(message)
+
+		if (running) {
+			this._run_in_loop()
+		}
 	}
 
 	_run_in_loop() {
@@ -84,15 +104,11 @@ class UI {
 		}
 	}
 
-	_on_stop() {
-		this._set_running(false)
-		this._append_console("Stopped")
-	}
-
 	_set_running(running: boolean) {
 		this._running = running
-		this._run.disabled = running
-		this._stop.disabled = !running
+		this._play_pause.textContent = running
+			? String.fromCodePoint(0x23F8)
+			: String.fromCodePoint(0x25B6)
 	}
 
 	_redraw_screen() {
@@ -119,7 +135,12 @@ class UI {
 		}
 	}
 
-	_colours = [
+	_value_to_colour(value: number) {
+		const index = (value & 0x0F)
+		return "#" + this._colours[index]
+	}
+
+	readonly _colours = [
 		"000000", // Black
 		"FFFFFF", // White
 		"880000", // Red
@@ -138,18 +159,17 @@ class UI {
 		"BBBBBB", // Light gray / Gray 3
 	]
 
-	_value_to_colour(value: number) {
-		const index = (value & 0x0F)
-		return "#" + this._colours[index]
-	}
-
 	_append_console(output: string) {
 		const console_ = this._console
 		const separator = console_.value
 			? "\n"
 			: ""
 		console_.value += separator + output
-		console_.scrollTop = console_.scrollHeight
+		this._scroll_to_bottom(console_)
+	}
+
+	_scroll_to_bottom(text_area: HTMLTextAreaElement) {
+		text_area.scrollTop = text_area.scrollHeight
 	}
 }
 
