@@ -1,4 +1,5 @@
-import { Processor, Opcodes } from './processor'
+import { Processor } from './processor'
+import { compile } from './compiler'
 
 class UI {
 	_processor: Processor = new Processor()
@@ -9,94 +10,56 @@ class UI {
 	_screen = document.getElementById("Screen") as HTMLCanvasElement ?? _throwForNull()
 	_screen_context: CanvasRenderingContext2D = this._screen.getContext("2d") ?? _throwForNull()
 
-	_console: HTMLElement = document.getElementById("Console") ?? _throwForNull()
+	_console = document.getElementById("Console") ?? _throwForNull()
+
+	_editor = document.getElementById("Editor") as HTMLTextAreaElement ?? _throwForNull()
+
+	_compile = document.getElementById("Compile") as HTMLButtonElement ?? _throwForNull()
+	_run = document.getElementById("Run") as HTMLButtonElement ?? _throwForNull()
+	_stop = document.getElementById("Stop") as HTMLButtonElement ?? _throwForNull()
 
 	_frame_time_length_ms: number = (1000 / 60)
 
-	load_program() {
-		// define row_lo $00
-		// define row_hi $01
-		// define colour $02
+	_running = false
 
-		// define screen_start $02
-		// define screen_end $06
+	constructor() {
+		this._compile.onclick = () => this.compile()
+		this._run.onclick = () => this.run()
+		this._stop.onclick = () => this.stop()
+		this._set_running(false)
+	}
 
-		// LDA #$00
-		// STA row_lo
-		// STA colour
+	set_source(source: string) {		
+		this._editor.value = source
+	}
 
-		// start:
-		// CLC
-		// LDY #$00
-		// INC colour
-		// LDA #screen_start
-		// STA row_hi
+	compile() {
+		const source = this._editor.value
 
-		// draw:
-		// LDA colour
-		// STA (row_lo),Y
-		// TYA
-		// ADC #$01
-		// TAY
-		// LDA row_hi
-		// ADC #$00
-		// CMP #screen_end
-		// BEQ start
-		// STA row_hi
+		try {
+			const program = compile(source, this._processor.program_counter)
+			this._processor.load_program(program)
+		}
+		catch (error: any) {
+			this._append_console(error.message)
+			return
+		}
 
-		// JMP draw
+		this._append_console("Compiled")
+	}
 
-		const row_lo = 0x00
-		const row_hi = 0x01
-		const colour = 0x02
-
-		const screen_start = 0x02
-		const screen_end = 0x06
-
-		const program = new Uint8Array([
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			0x00,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
-			row_lo,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
-			colour,
-			// start:
-			Opcodes.CLEAR_CARRY,
-			Opcodes.LOAD_Y_IMMEDIATE,
-			0x00,
-			Opcodes.INCREMENT_ZERO_PAGE,
-			colour,
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			screen_start,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
-			row_hi,
-			// draw:
-			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
-			colour,
-			Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED,
-			row_lo,
-			Opcodes.TRANSFER_Y_TO_ACCUMULATOR,
-			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
-			0x01,
-			Opcodes.TRANSFER_ACCUMULATOR_TO_Y,
-			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
-			row_hi,
-			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
-			0x00,
-			Opcodes.COMPARE_IMMEDIATE,
-			screen_end,
-			Opcodes.BRANCH_IF_EQUAL,
-			0x100 - 25,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
-			row_hi,
-			Opcodes.JUMP_ABSOLUTE,
-			0x0F,
-			0x06,
-		])
-		this._processor.load_program(program)
+	stop() {
+		this._set_running(false)
+		this._append_console("Stopped")
 	}
 
 	run() {
+		this._append_console("Running...")
+		this._set_running(true)
+		this._run_in_loop()
+	}
+
+	_run_in_loop() {
 		var proceed = false
 		var now = performance.now()
 		var next_frame_time = now + this._frame_time_length_ms
@@ -114,13 +77,22 @@ class UI {
 
 			if (!proceed) {
 				this._append_console("Done")
+				this._set_running(false)
 				return
 			}
 
 			now = performance.now()
 		}
 
-		setTimeout(() => this.run(), 0)
+		if (this._running) {
+			setTimeout(() => this._run_in_loop(), 0)
+		}
+	}
+
+	_set_running(running: boolean) {
+		this._running = running
+		this._run.disabled = running
+		this._stop.disabled = !running
 	}
 
 	_redraw_screen() {
@@ -183,5 +155,36 @@ function _throwForNull(): never {
 
 const ui = new UI()
 
-ui.load_program()
-ui.run()
+const source = `\
+define row_lo $00
+define row_hi $01
+define colour $02
+
+define screen_start $02
+define screen_end $06
+
+LDA #$00
+STA row_lo
+STA colour
+
+start:
+CLC
+LDY #$00
+INC colour
+LDA #screen_start
+STA row_hi
+
+draw:
+LDA colour
+STA (row_lo),Y
+TYA
+ADC #$01
+TAY
+LDA row_hi
+ADC #$00
+CMP #screen_end
+BEQ start
+STA row_hi
+
+JMP draw`
+ui.set_source(source)
