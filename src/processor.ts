@@ -1,23 +1,4 @@
-export enum Opcodes {
-	BREAK = 0x00,
-	CLEAR_CARRY = 0x18,
-	JUMP_ABSOLUTE = 0x4C,
-	ADD_WITH_CARRY_IMMEDIATE = 0x69,
-	STORE_ACCUMULATOR_ZERO_PAGE = 0x85,
-	DECREMENT_Y = 0x88,
-	STORE_ACCUMULATOR_ABSOLUTE = 0x8D,
-	STORE_ACCUMULATOR_INDIRECT_Y_INDEXED = 0x91,
-	TRANSFER_Y_TO_ACCUMULATOR = 0x98,
-	STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED = 0x99,
-	LOAD_Y_IMMEDIATE = 0xA0,
-	LOAD_ACCUMULATOR_ZERO_PAGE = 0xA5,
-	TRANSFER_ACCUMULATOR_TO_Y = 0xA8,
-	LOAD_ACCUMULATOR_IMMEDIATE = 0xA9,
-	INCREMENT_Y = 0xC8,
-	COMPARE_IMMEDIATE = 0xC9,
-	INCREMENT_ZERO_PAGE = 0xE6,
-	BRANCH_IF_EQUAL = 0xF0,
-}
+import { Opcode } from './opcodes'
 
 export class Processor {
 	readonly memory: Uint8Array = new Uint8Array(0x10000)
@@ -38,65 +19,65 @@ export class Processor {
 	}
 
 	advance() {
-		const op_code = this._next()
+		const opcode = this._next()
 
-		switch (op_code) {
-		case Opcodes.BREAK:
+		switch (opcode) {
+		case Opcode.BREAK:
 			return false
-		case Opcodes.CLEAR_CARRY:
+		case Opcode.CLEAR_CARRY:
 			this.status.carry = false
 			break
-		case Opcodes.JUMP_ABSOLUTE:
+		case Opcode.JUMP_ABSOLUTE:
 			this.program_counter = this._absolute_address()
 			break
-		case Opcodes.ADD_WITH_CARRY_IMMEDIATE:
+		case Opcode.ADD_WITH_CARRY_IMMEDIATE:
 			this._add_with_carry(this._next())
 			break
-		case Opcodes.STORE_ACCUMULATOR_ZERO_PAGE:
+		case Opcode.STORE_ACCUMULATOR_ZERO_PAGE:
 			this._store(this.accumulator, this._zero_page_address())
 			break
-		case Opcodes.DECREMENT_Y:
+		case Opcode.DECREMENT_Y:
 			this._decrement_register(this.y)
 			break
-		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE:
+		case Opcode.STORE_ACCUMULATOR_ABSOLUTE:
 			this._store(this.accumulator, this._absolute_address())
 			break
-		case Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED:
+		case Opcode.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED:
 			this._store(this.accumulator, this._indirect_y_indexed_address())
 			break
-		case Opcodes.TRANSFER_Y_TO_ACCUMULATOR:
+		case Opcode.TRANSFER_Y_TO_ACCUMULATOR:
 			this._transfer(this.y, this.accumulator)
 			break
-		case Opcodes.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED:
+		case Opcode.STORE_ACCUMULATOR_ABSOLUTE_Y_INDEXED:
 			this._store(this.accumulator, this._absolute_y_indexed_address())
 			break
-		case Opcodes.LOAD_Y_IMMEDIATE:
+		case Opcode.LOAD_Y_IMMEDIATE:
 			this._load_immediate(this.y)
 			break
-		case Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE:
+		case Opcode.LOAD_ACCUMULATOR_ZERO_PAGE:
 			this._load_from_address(this.accumulator, this._zero_page_address())
 			break
-		case Opcodes.TRANSFER_ACCUMULATOR_TO_Y:
+		case Opcode.TRANSFER_ACCUMULATOR_TO_Y:
 			this._transfer(this.accumulator, this.y)
 			break
-		case Opcodes.LOAD_ACCUMULATOR_IMMEDIATE:
+		case Opcode.LOAD_ACCUMULATOR_IMMEDIATE:
 			this._load_immediate(this.accumulator)
 			break
-		case Opcodes.INCREMENT_Y:
+		case Opcode.INCREMENT_Y:
 			this._increment_register(this.y)
 			break
-		case Opcodes.COMPARE_IMMEDIATE:
+		case Opcode.COMPARE_IMMEDIATE:
 			// TODO: Set all relevant status flags
 			this.status.zero = this.accumulator.getValue() == this._next()
 			break
-		case Opcodes.INCREMENT_ZERO_PAGE:
+		case Opcode.INCREMENT_ZERO_PAGE:
 			this._increment_memory(this._zero_page_address())
 			break
-		case Opcodes.BRANCH_IF_EQUAL:
+		case Opcode.BRANCH_IF_EQUAL:
 			this._branch_if(this.status.zero)
 			break
 		default:
-			throw new Error(`Unknown opcode (${_hex(op_code)}), terminating program.`)
+			throw new Error(`Unknown opcode (${_hex(opcode)}), terminating program.`)
 		}
 
 		return true

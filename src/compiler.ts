@@ -1,4 +1,4 @@
-import { Opcodes } from './processor'
+import { Opcode } from './opcodes'
 
 export function compile(source: string, program_start: number) {
 	const state = new State(program_start)
@@ -7,27 +7,27 @@ export function compile(source: string, program_start: number) {
 		.split('\n')
 		.map((text, index) => { return {text, index} })
 		.filter(line => line.text)
-		.map(line => _line_to_op_codes(line, state))
+		.map(line => _line_to_opcodes(line, state))
 		.flat()
 
 	return new Uint8Array(program)
 }
 
-function _line_to_op_codes({text, index}: {text: string, index: number}, state: State) {
+function _line_to_opcodes({text, index}: {text: string, index: number}, state: State) {
 	const line = new Line(text, index)
 
-	const op_codes = _get_op_codes(line, state)
+	const opcodes = _get_opcodes(line, state)
 
 	if (line.extra_words()) {
 		throw line.error("Extra words")
 	}
 
-	state.increment_program_pointer(op_codes.length)
+	state.increment_program_pointer(opcodes.length)
 
-	return op_codes
+	return opcodes
 }
 
-function _get_op_codes(line: Line, state: State) {
+function _get_opcodes(line: Line, state: State) {
 	const first_word = line.next_word()
 
 	if (first_word === "define") {
@@ -51,48 +51,48 @@ function _get_op_codes(line: Line, state: State) {
 	if (first_word === "JMP") {
 		const address = _get_label_address(line, state)
 		const [lo, hi] = to_little_endian_bytes(address)
-		return [Opcodes.JUMP_ABSOLUTE, lo, hi]
+		return [Opcode.JUMP_ABSOLUTE, lo, hi]
 	}
 	if (first_word === "BEQ") {
 		const target_address = _get_label_address(line, state)
 		const address_diff = state.get_program_pointer() - target_address
 		const signed_relative_jump_byte = 0x100 - (2 + address_diff)
-		return [Opcodes.BRANCH_IF_EQUAL, signed_relative_jump_byte]
+		return [Opcode.BRANCH_IF_EQUAL, signed_relative_jump_byte]
 	}
 	if (first_word === "LDA") {
 		return _addressed(line, state, {
-			immediate: Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
-			zero_page: Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE})
+			immediate: Opcode.LOAD_ACCUMULATOR_IMMEDIATE,
+			zero_page: Opcode.LOAD_ACCUMULATOR_ZERO_PAGE})
 	}
 	if (first_word === "LDY") {
 		return _addressed(line, state, {
-			immediate: Opcodes.LOAD_Y_IMMEDIATE})
+			immediate: Opcode.LOAD_Y_IMMEDIATE})
 	}
 	if (first_word === "INC") {
 		return _addressed(line, state, {
-			zero_page: Opcodes.INCREMENT_ZERO_PAGE})
+			zero_page: Opcode.INCREMENT_ZERO_PAGE})
 	}
 	if (first_word === "STA") {
 		return _addressed(line, state, {
-			zero_page: Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
-			indirect_y_indexed: Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED})
+			zero_page: Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
+			indirect_y_indexed: Opcode.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED})
 	}
 	if (first_word === "ADC") {
 		return _addressed(line, state, {
-			immediate: Opcodes.ADD_WITH_CARRY_IMMEDIATE})
+			immediate: Opcode.ADD_WITH_CARRY_IMMEDIATE})
 	}
 	if (first_word === "CMP") {
 		return _addressed(line, state, {
-			immediate: Opcodes.COMPARE_IMMEDIATE})
+			immediate: Opcode.COMPARE_IMMEDIATE})
 	}
 
 	throw line.error("Unknown operator")
 }
 
-const _singletons = new Map<string, Opcodes>([
-	["CLC", Opcodes.CLEAR_CARRY],
-	["TAY", Opcodes.TRANSFER_ACCUMULATOR_TO_Y],
-	["TYA", Opcodes.TRANSFER_Y_TO_ACCUMULATOR],
+const _singletons = new Map<string, Opcode>([
+	["CLC", Opcode.CLEAR_CARRY],
+	["TAY", Opcode.TRANSFER_ACCUMULATOR_TO_Y],
+	["TYA", Opcode.TRANSFER_Y_TO_ACCUMULATOR],
 ])
 
 function _get_label_address(line: Line, state: State) {
@@ -106,37 +106,37 @@ function _get_label_address(line: Line, state: State) {
 	return address 
 }
 
-function _addressed(line: Line, state: State, addressingOpcodes: AddressingOpcodes = {}) {
+function _addressed(line: Line, state: State, opcodes: AddressingOpcodes = {}) {
 	const second_word = line.next_word()
-	const [op_code, number_string] = _address_opcode(second_word, addressingOpcodes)
+	const [opcode, number_string] = _address_opcode(second_word, opcodes)
 
-	if (op_code === undefined) {
+	if (opcode === undefined) {
 		throw line.error("Numeric argument type not supported")
 	}
 
 	const value = _parse_number(number_string, state)
-	return [op_code, value]
+	return [opcode, value]
 }
 
-function _address_opcode(second_word: string, addressingOpcodes: AddressingOpcodes)
-		: [Opcodes | undefined, string] {
+function _address_opcode(second_word: string, opcodes: AddressingOpcodes)
+		: [Opcode | undefined, string] {
 	const immediate_number_string = match_group_1(second_word, /#(.*)/)
 	if (immediate_number_string !== null) {
-		return [addressingOpcodes.immediate, immediate_number_string]
+		return [opcodes.immediate, immediate_number_string]
 	}
 
 	const indirect_y_indexed_number_string = match_group_1(second_word, /\(([^)]*)\),Y/)
 	if (indirect_y_indexed_number_string !== null) {
-		return [addressingOpcodes.indirect_y_indexed, indirect_y_indexed_number_string]
+		return [opcodes.indirect_y_indexed, indirect_y_indexed_number_string]
 	}
 
-	return [addressingOpcodes.zero_page, second_word]
+	return [opcodes.zero_page, second_word]
 }
 
 interface AddressingOpcodes {
-	immediate?: Opcodes,
-	zero_page?: Opcodes,
-	indirect_y_indexed?: Opcodes,
+	immediate?: Opcode,
+	zero_page?: Opcode,
+	indirect_y_indexed?: Opcode,
 }
 
 function _parse_number(source: string, state: State) {

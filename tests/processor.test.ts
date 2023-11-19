@@ -1,4 +1,5 @@
-import { Processor, Opcodes } from '../src/processor'
+import { Processor } from '../src/processor'
+import { Opcode } from '../src/opcodes'
 
 describe('Processor', () => {
     test('default values', () => {
@@ -42,7 +43,7 @@ describe('Processor', () => {
 function _test_clear_carry(carry: boolean) {
     const processor = new Processor()
     processor.status.carry = carry
-    const program = new Uint8Array([Opcodes.CLEAR_CARRY])
+    const program = new Uint8Array([Opcode.CLEAR_CARRY])
     processor.load_program(program)
 
     const proceed = processor.advance()

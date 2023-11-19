@@ -1,5 +1,5 @@
 import { compile } from '../src/compiler'
-import { Opcodes } from '../src/processor'
+import { Opcode } from '../src/opcodes'
 
 describe('Compiler', () => {
 	test('long program', () => {
@@ -46,42 +46,42 @@ JMP draw`
 		const screen_end = 0x06
 
 		const expected = new Uint8Array([
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
+			Opcode.LOAD_ACCUMULATOR_IMMEDIATE,
 			0x00,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
 			row_lo,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
 			colour,
 			// start:
-			Opcodes.CLEAR_CARRY,
-			Opcodes.LOAD_Y_IMMEDIATE,
+			Opcode.CLEAR_CARRY,
+			Opcode.LOAD_Y_IMMEDIATE,
 			0x00,
-			Opcodes.INCREMENT_ZERO_PAGE,
+			Opcode.INCREMENT_ZERO_PAGE,
 			colour,
-			Opcodes.LOAD_ACCUMULATOR_IMMEDIATE,
+			Opcode.LOAD_ACCUMULATOR_IMMEDIATE,
 			screen_start,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
 			row_hi,
 			// draw:
-			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
+			Opcode.LOAD_ACCUMULATOR_ZERO_PAGE,
 			colour,
-			Opcodes.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED,
+			Opcode.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED,
 			row_lo,
-			Opcodes.TRANSFER_Y_TO_ACCUMULATOR,
-			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
+			Opcode.TRANSFER_Y_TO_ACCUMULATOR,
+			Opcode.ADD_WITH_CARRY_IMMEDIATE,
 			0x01,
-			Opcodes.TRANSFER_ACCUMULATOR_TO_Y,
-			Opcodes.LOAD_ACCUMULATOR_ZERO_PAGE,
+			Opcode.TRANSFER_ACCUMULATOR_TO_Y,
+			Opcode.LOAD_ACCUMULATOR_ZERO_PAGE,
 			row_hi,
-			Opcodes.ADD_WITH_CARRY_IMMEDIATE,
+			Opcode.ADD_WITH_CARRY_IMMEDIATE,
 			0x00,
-			Opcodes.COMPARE_IMMEDIATE,
+			Opcode.COMPARE_IMMEDIATE,
 			screen_end,
-			Opcodes.BRANCH_IF_EQUAL,
+			Opcode.BRANCH_IF_EQUAL,
 			0x100 - 25,
-			Opcodes.STORE_ACCUMULATOR_ZERO_PAGE,
+			Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
 			row_hi,
-			Opcodes.JUMP_ABSOLUTE,
+			Opcode.JUMP_ABSOLUTE,
 			0x0F,
 			0x06,
 		])
