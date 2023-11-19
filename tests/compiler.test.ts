@@ -38,7 +38,6 @@ JMP draw`
 
 		const actual = compile(source, 0x600)
 
-
 		const row_lo = 0x00
 		const row_hi = 0x01
 		const colour = 0x02

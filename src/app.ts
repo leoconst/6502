@@ -10,7 +10,7 @@ class UI {
 	_screen = document.getElementById("Screen") as HTMLCanvasElement ?? _throwForNull()
 	_screen_context: CanvasRenderingContext2D = this._screen.getContext("2d") ?? _throwForNull()
 
-	_console = document.getElementById("Console") ?? _throwForNull()
+	_console = document.getElementById("Console") as HTMLTextAreaElement ?? _throwForNull()
 
 	_editor = document.getElementById("Editor") as HTMLTextAreaElement ?? _throwForNull()
 
@@ -23,9 +23,9 @@ class UI {
 	_running = false
 
 	constructor() {
-		this._compile.onclick = () => this.compile()
-		this._run.onclick = () => this.run()
-		this._stop.onclick = () => this.stop()
+		this._compile.onclick = () => this._on_compile()
+		this._run.onclick = () => this._on_run()
+		this._stop.onclick = () => this._on_stop()
 		this._set_running(false)
 	}
 
@@ -33,7 +33,7 @@ class UI {
 		this._editor.value = source
 	}
 
-	compile() {
+	_on_compile() {
 		const source = this._editor.value
 
 		try {
@@ -48,12 +48,7 @@ class UI {
 		this._append_console("Compiled")
 	}
 
-	stop() {
-		this._set_running(false)
-		this._append_console("Stopped")
-	}
-
-	run() {
+	_on_run() {
 		this._append_console("Running...")
 		this._set_running(true)
 		this._run_in_loop()
@@ -87,6 +82,11 @@ class UI {
 		if (this._running) {
 			setTimeout(() => this._run_in_loop(), 0)
 		}
+	}
+
+	_on_stop() {
+		this._set_running(false)
+		this._append_console("Stopped")
 	}
 
 	_set_running(running: boolean) {
@@ -144,7 +144,12 @@ class UI {
 	}
 
 	_append_console(output: string) {
-		this._console.innerHTML += output + "\n"
+		const console_ = this._console
+		const separator = console_.value
+			? "\n"
+			: ""
+		console_.value += separator + output
+		console_.scrollTop = console_.scrollHeight
 	}
 }
 
