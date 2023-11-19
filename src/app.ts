@@ -99,9 +99,11 @@ class UI {
 	run() {
 		var proceed = false
 		var now = performance.now()
-		var next_frame_time = now - (now % this._frame_time_length_ms) + this._frame_time_length_ms
+		var next_frame_time = now + this._frame_time_length_ms
 
-		while (true) {
+		this._redraw_screen()
+
+		while (now < next_frame_time) {
 			try {
 				proceed = this._processor.advance()
 			}
@@ -110,18 +112,15 @@ class UI {
 				return
 			}
 
-			this._redraw_screen()
-
 			if (!proceed) {
 				this._append_console("Done")
 				return
 			}
 
-			if (performance.now() > next_frame_time) {
-				setTimeout(() => this.run(), 0)
-				return
-			}
+			now = performance.now()
 		}
+
+		setTimeout(() => this.run(), 0)
 	}
 
 	_redraw_screen() {
