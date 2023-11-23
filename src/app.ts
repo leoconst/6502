@@ -24,7 +24,7 @@ class UI {
 
 	constructor() {
 		this._compile.onclick = () => this._on_compile()
-		this._play_pause.onclick = () => this._on_start_stop()
+		this._play_pause.onclick = () => this._on_play_pause()
 		this._set_running(false)
 		this._redraw_screen()
 	}
@@ -59,7 +59,7 @@ class UI {
 		this._redraw_screen()
 	}
 
-	_on_start_stop() {
+	_on_play_pause() {
 		const running = !this._running
 
 		this._set_running(running)
