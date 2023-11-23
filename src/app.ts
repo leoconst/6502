@@ -181,13 +181,17 @@ function _throwForNull(): never {
 const ui = new UI()
 
 const source = `\
+; Addresses used for drawing:
 define row_lo $00
 define row_hi $01
 define colour $02
 
+; Screen memory constants,
+; pages 2-5, inclusive:
 define screen_start $02
 define screen_end $06
 
+; Initialise 'variables':
 LDA #$00
 STA row_lo
 STA colour

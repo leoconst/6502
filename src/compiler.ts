@@ -5,12 +5,21 @@ export function compile(source: string, program_start: number) {
 
 	const program = source
 		.split('\n')
-		.map((text, index) => { return {text, index} })
-		.filter(line => line.text)
+		.map((text, index) => _make_raw_line(text, index))
+		.filter(line => line.clean_text)
 		.map(line => _line_to_opcodes(line, state))
 		.flat()
 
 	return new Uint8Array(program)
+}
+
+function _make_raw_line(original_text: string, index: number) {
+	const clean_text = original_text.split(";")[0].trim()
+	return {
+		original_text,
+		clean_text,
+		index
+	}
 }
 
 function _line_to_opcodes(raw_line: RawLine, state: State) {
@@ -196,17 +205,17 @@ class State {
 }
 
 class Line {
-	readonly _text
+	readonly _original_text
 	readonly _index
 	readonly _words
 
 	_word_index = 0
 
 	constructor(raw_line: RawLine) {
-		this._text = raw_line.text
+		this._original_text = raw_line.original_text
 		this._index = raw_line.index
-		this._words = this._text
-			.split(' ')
+		this._words = raw_line.clean_text
+			.split(/\s+/)
 			.map(part => part.trim())
 	}
 
@@ -228,7 +237,7 @@ class Line {
 
 	error(message: string) {
 		const line_number = this._index + 1
-		return new Error(`${message} on line ${line_number}:\n${this._text}`)
+		return new Error(`${message} on line ${line_number}:\n${this._original_text}`)
 	}
 }
 
@@ -253,6 +262,7 @@ function match_group_1(string: string, regex: RegExp) {
 }
 
 interface RawLine {
-	text: string,
+	original_text: string,
+	clean_text: string
 	index: number,
 }
