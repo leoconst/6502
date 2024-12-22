@@ -56,6 +56,9 @@ export class Processor {
 		case Opcode.LOAD_Y_IMMEDIATE:
 			this._load_immediate(this.y)
 			break
+		case Opcode.LOAD_X_IMMEDIATE:
+			this._load_immediate(this.x)
+			break
 		case Opcode.LOAD_ACCUMULATOR_ZERO_PAGE:
 			this._load_from_address(this.accumulator, this._zero_page_address())
 			break
@@ -69,11 +72,22 @@ export class Processor {
 			this._increment_register(this.y)
 			break
 		case Opcode.COMPARE_IMMEDIATE:
-			// TODO: Set all relevant status flags
-			this.status.zero = this.accumulator.getValue() == this._next()
+			this._compare_immediate(this.accumulator)
+			break
+		case Opcode.BRANCH_IF_NOT_EQUAL:
+			this._branch_if(!this.status.zero)
+			break
+		case Opcode.COMPARE_X_IMMEDIATE:
+			this._compare_immediate(this.x)
 			break
 		case Opcode.INCREMENT_ZERO_PAGE:
 			this._increment_memory(this._zero_page_address())
+			break
+		case Opcode.INCREMENT_X:
+			this._increment_register(this.x)
+			break
+		case Opcode.NO_OPERATION:
+			// TODO: Cycle simulation
 			break
 		case Opcode.BRANCH_IF_EQUAL:
 			this._branch_if(this.status.zero)
@@ -104,6 +118,11 @@ export class Processor {
 		if (condition) {
 			this.program_counter += this._from_twos_compliment(relative_jump) + 1
 		}
+	}
+
+	_compare_immediate(register: Register) {
+		// TODO: Set all relevant status flags
+		this.status.zero = register.getValue() == this._next()
 	}
 
 	_from_twos_compliment(value: number) {

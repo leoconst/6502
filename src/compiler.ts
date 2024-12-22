@@ -110,13 +110,12 @@ function _get_units(line: Line, state: State) {
 		return [Opcode.JUMP_ABSOLUTE, jump]
 	}
 	if (first_word === "BEQ") {
-		const label = line.next_word()
-		const jump: RelativeJump = {
-			kind: "relative",
-			label,
-			start_address: state.get_program_pointer()
-		}
+		const jump = _relative_jump(line, state)
 		return [Opcode.BRANCH_IF_EQUAL, jump]
+	}
+	if (first_word === "BNE") {
+		const jump = _relative_jump(line, state)
+		return [Opcode.BRANCH_IF_NOT_EQUAL, jump]
 	}
 	if (first_word === "LDA") {
 		return _addressed(line, state, {
@@ -126,6 +125,10 @@ function _get_units(line: Line, state: State) {
 	if (first_word === "LDY") {
 		return _addressed(line, state, {
 			immediate: Opcode.LOAD_Y_IMMEDIATE})
+	}
+	if (first_word === "LDX") {
+		return _addressed(line, state, {
+			immediate: Opcode.LOAD_X_IMMEDIATE})
 	}
 	if (first_word === "INC") {
 		return _addressed(line, state, {
@@ -144,9 +147,22 @@ function _get_units(line: Line, state: State) {
 		return _addressed(line, state, {
 			immediate: Opcode.COMPARE_IMMEDIATE})
 	}
+	if (first_word === "CPX") {
+		return _addressed(line, state, {
+			immediate: Opcode.COMPARE_X_IMMEDIATE})
+	}
 
 	throw line.error("Unknown operator")
 }
+
+const _singletons = new Map<string, Opcode>([
+	["CLC", Opcode.CLEAR_CARRY],
+	["TAY", Opcode.TRANSFER_ACCUMULATOR_TO_Y],
+	["TYA", Opcode.TRANSFER_Y_TO_ACCUMULATOR],
+	["INY", Opcode.INCREMENT_Y],
+	["INX", Opcode.INCREMENT_X],
+	["NOP", Opcode.NO_OPERATION],
+])
 
 function _to_twos_compliment(value: number) {
 	return value < 0
@@ -154,12 +170,14 @@ function _to_twos_compliment(value: number) {
 		: value
 }
 
-const _singletons = new Map<string, Opcode>([
-	["CLC", Opcode.CLEAR_CARRY],
-	["TAY", Opcode.TRANSFER_ACCUMULATOR_TO_Y],
-	["TYA", Opcode.TRANSFER_Y_TO_ACCUMULATOR],
-	["INY", Opcode.INCREMENT_Y]
-])
+function _relative_jump(line: Line, state: State): RelativeJump {
+	const label = line.next_word()
+	return {
+		kind: "relative",
+		label,
+		start_address: state.get_program_pointer()
+	}
+}
 
 function _get_label_address(name: string, state: State) {
 	const address = state.get_label(name)
