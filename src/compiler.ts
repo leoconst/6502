@@ -3,14 +3,46 @@ import { Opcode } from './opcodes'
 export function compile(source: string, program_start: number) {
 	const state = new State(program_start)
 
-	const program = source
+	const units = _parse_compilation_units(source, state)
+	const program = _resolve_jumps(units, state)
+
+	return new Uint8Array(program)
+}
+
+function _parse_compilation_units(source: string, state: State) {
+	return source
 		.split('\n')
 		.map((text, index) => _make_raw_line(text, index))
 		.filter(line => line.clean_text)
-		.map(line => _line_to_opcodes(line, state))
+		.map(line => _line_to_units(line, state))
 		.flat()
+}
 
-	return new Uint8Array(program)
+function _resolve_jumps(units: Unit[], state: State) {
+	return units
+		.map(unit => _resolve_when_jump(unit, state))
+		.flat()
+}
+
+function _resolve_when_jump(unit: Unit, state: State) {
+	return typeof unit == "number"
+		? [unit]
+		: _resolve_jump(unit, state)
+}
+
+function _resolve_jump(jump: Jump, state: State) {
+	const target_address = _get_label_address(jump.label, state)
+
+	switch (jump.kind)
+	{
+		case "absolute":
+			return to_little_endian_bytes(target_address)
+		case "relative":
+			const address_after_jump_byte = jump.start_address + 1
+			const address_difference = target_address - address_after_jump_byte
+			const signed_relative_jump_byte = _to_twos_compliment(address_difference)
+			return [signed_relative_jump_byte]
+	}
 }
 
 function _make_raw_line(original_text: string, index: number) {
@@ -22,21 +54,33 @@ function _make_raw_line(original_text: string, index: number) {
 	}
 }
 
-function _line_to_opcodes(raw_line: RawLine, state: State) {
+function _line_to_units(raw_line: RawLine, state: State) {
 	const line = new Line(raw_line)
 
-	const opcodes = _get_opcodes(line, state)
+	const units = _get_units(line, state)
 
 	if (line.extra_words()) {
 		throw line.error("Extra words")
 	}
 
-	state.increment_program_pointer(opcodes.length)
+	state.increment_program_pointer(_units_size(units))
 
-	return opcodes
+	return units
 }
 
-function _get_opcodes(line: Line, state: State) {
+function _units_size(units: Unit[]) {
+	return units
+		.map(_unit_size)
+		.reduce((left, right) => left + right, 0)
+}
+
+function _unit_size(unit: Unit) {
+	return typeof unit == "number" || unit.kind == "relative"
+		? 1
+		: 2
+}
+
+function _get_units(line: Line, state: State) {
 	const first_word = line.next_word()
 
 	if (first_word === "define") {
@@ -58,17 +102,21 @@ function _get_opcodes(line: Line, state: State) {
 	}
 
 	if (first_word === "JMP") {
-		const address = _get_label_address(line, state)
-		const [lo, hi] = to_little_endian_bytes(address)
-		return [Opcode.JUMP_ABSOLUTE, lo, hi]
+		const label = line.next_word()
+		const jump: AbsoluteJump = {
+			kind: "absolute",
+			label,
+		}
+		return [Opcode.JUMP_ABSOLUTE, jump]
 	}
 	if (first_word === "BEQ") {
-		const target_address = _get_label_address(line, state)
-		const execution_length = 2
-		const address_after_execution = state.get_program_pointer() + execution_length
-		const address_diff = target_address - address_after_execution
-		const signed_relative_jump_byte = _to_twos_compliment(address_diff)
-		return [Opcode.BRANCH_IF_EQUAL, signed_relative_jump_byte]
+		const label = line.next_word()
+		const jump: RelativeJump = {
+			kind: "relative",
+			label,
+			start_address: state.get_program_pointer()
+		}
+		return [Opcode.BRANCH_IF_EQUAL, jump]
 	}
 	if (first_word === "LDA") {
 		return _addressed(line, state, {
@@ -102,7 +150,7 @@ function _get_opcodes(line: Line, state: State) {
 
 function _to_twos_compliment(value: number) {
 	return value < 0
-		? 0x100 + value
+		? 0xFF + value
 		: value
 }
 
@@ -113,12 +161,11 @@ const _singletons = new Map<string, Opcode>([
 	["INY", Opcode.INCREMENT_Y]
 ])
 
-function _get_label_address(line: Line, state: State) {
-	const name = line.next_word()
+function _get_label_address(name: string, state: State) {
 	const address = state.get_label(name)
 
 	if (address === undefined) {
-		throw line.error(`Label '${name}' not present`)
+		throw Error(`Label '${name}' not present`)
 	}
 
 	return address 
@@ -261,8 +308,23 @@ function match_group_1(string: string, regex: RegExp) {
 	return group_1
 }
 
+type Unit = number|Jump
+
 interface RawLine {
-	original_text: string,
+	original_text: string
 	clean_text: string
-	index: number,
+	index: number
+}
+
+type Jump = AbsoluteJump|RelativeJump
+
+interface AbsoluteJump {
+	kind: "absolute",
+	label: string
+}
+
+interface RelativeJump {
+	kind: "relative"
+	label: string,
+	start_address: number
 }

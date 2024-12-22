@@ -102,11 +102,11 @@ export class Processor {
 	_branch_if(condition: boolean) {
 		const relative_jump = this._next()
 		if (condition) {
-			this.program_counter += this._twos_compliment(relative_jump) + 1
+			this.program_counter += this._from_twos_compliment(relative_jump) + 1
 		}
 	}
 
-	_twos_compliment(value: number) {
+	_from_twos_compliment(value: number) {
 		return value > 0x7F
 			? -0x100 + value
 			: value
