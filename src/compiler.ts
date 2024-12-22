@@ -102,12 +102,12 @@ function _get_units(line: Line, state: State) {
 	}
 
 	if (first_word === "JMP") {
-		const label = line.next_word()
-		const jump: AbsoluteJump = {
-			kind: "absolute",
-			label,
-		}
+		const jump = _absolute_jump(line)
 		return [Opcode.JUMP_ABSOLUTE, jump]
+	}
+	if (first_word === "JSR") {
+		const jump = _absolute_jump(line)
+		return [Opcode.JUMP_TO_SUBROUTINE, jump]
 	}
 	if (first_word === "BEQ") {
 		const jump = _relative_jump(line, state)
@@ -156,6 +156,7 @@ function _get_units(line: Line, state: State) {
 }
 
 const _singletons = new Map<string, Opcode>([
+	["RTS", Opcode.RETURN_FROM_SUBROUTINE],
 	["CLC", Opcode.CLEAR_CARRY],
 	["TAY", Opcode.TRANSFER_ACCUMULATOR_TO_Y],
 	["TYA", Opcode.TRANSFER_Y_TO_ACCUMULATOR],
@@ -168,6 +169,14 @@ function _to_twos_compliment(value: number) {
 	return value < 0
 		? 0xFF + value
 		: value
+}
+
+function _absolute_jump(line: Line): AbsoluteJump {
+	const label = line.next_word()
+	return {
+		kind: "absolute",
+		label,
+	}
 }
 
 function _relative_jump(line: Line, state: State): RelativeJump {

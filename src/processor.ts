@@ -9,6 +9,8 @@ export class Processor {
 	readonly x: Register = new Register(this.status)
 	readonly y: Register = new Register(this.status)
 
+	readonly stack: Stack = new Stack(this.memory)
+
 	program_counter = 0
 
 	load_program(program: Uint8Array, program_start: number) {
@@ -29,9 +31,24 @@ export class Processor {
 		case Opcode.CLEAR_CARRY:
 			this.status.carry = false
 			break
+		case Opcode.JUMP_TO_SUBROUTINE: {
+			const return_address = this.program_counter + 2
+			const [return_address_lo, return_address_hi] = this._8_bit(return_address)
+			this.stack.push(return_address_hi)
+			this.stack.push(return_address_lo)
+			this.program_counter = this._absolute_address()
+			break
+		}
 		case Opcode.JUMP_ABSOLUTE:
 			this.program_counter = this._absolute_address()
 			break
+		case Opcode.RETURN_FROM_SUBROUTINE: {
+			const return_address_lo = this.stack.pop()
+			const return_address_hi = this.stack.pop()
+			const return_address = this._16_bit(return_address_lo, return_address_hi)
+			this.program_counter = return_address
+			break
+		}
 		case Opcode.ADD_WITH_CARRY_IMMEDIATE:
 			this._add_with_carry(this._next())
 			break
@@ -185,6 +202,12 @@ export class Processor {
 		return (hi * 0x100) + lo
 	}
 
+	_8_bit(value: number) {
+		const lo = value & 0xFF
+		const hi = value >> 8
+		return [lo, hi]
+	}
+
 	_next() {
 		const value = this.memory[this.program_counter]
 		this.program_counter += 1
@@ -223,6 +246,26 @@ class Status {
 	negative: boolean = false
 	zero: boolean = false
 	carry: boolean = false
+}
+
+class Stack {
+	readonly _memory: Uint8Array
+
+	pointer = 0x01_FF
+
+	constructor(memory: Uint8Array) {
+		this._memory = memory
+	}
+
+	push(value: number) {
+		this._memory[this.pointer] = value
+		++this.pointer
+	}
+
+	pop() {
+		--this.pointer
+		return this._memory[this.pointer]
+	}
 }
 
 function _hex(number: number) {
