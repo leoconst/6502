@@ -134,6 +134,10 @@ function _get_units(line: Line, state: State) {
 		return _addressed(line, state, {
 			zero_page: Opcode.INCREMENT_ZERO_PAGE})
 	}
+	if (first_word === "DEC") {
+		return _addressed(line, state, {
+			zero_page: Opcode.DECREMENT_ZERO_PAGE})
+	}
 	if (first_word === "STA") {
 		return _addressed(line, state, {
 			zero_page: Opcode.STORE_ACCUMULATOR_ZERO_PAGE,

@@ -85,6 +85,9 @@ export class Processor {
 		case Opcode.LOAD_ACCUMULATOR_IMMEDIATE:
 			this._load_immediate(this.accumulator)
 			break
+		case Opcode.DECREMENT_ZERO_PAGE:
+			this._decrement_memory(this._zero_page_address())
+			break
 		case Opcode.INCREMENT_Y:
 			this._increment_register(this.y)
 			break
@@ -158,6 +161,10 @@ export class Processor {
 
 	_increment_memory(address: number) {
 		this.memory[address] += 1
+	}
+
+	_decrement_memory(address: number) {
+		this.memory[address] -= 1
 	}
 
 	_load_immediate(register: Register) {
