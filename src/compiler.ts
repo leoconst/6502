@@ -124,7 +124,8 @@ function _get_units(line: Line, state: State) {
 	}
 	if (first_word === "LDY") {
 		return _addressed(line, state, {
-			immediate: Opcode.LOAD_Y_IMMEDIATE})
+			immediate: Opcode.LOAD_Y_IMMEDIATE,
+			zero_page: Opcode.LOAD_Y_ZERO_PAGE})
 	}
 	if (first_word === "LDX") {
 		return _addressed(line, state, {

@@ -76,8 +76,11 @@ export class Processor {
 		case Opcode.LOAD_X_IMMEDIATE:
 			this._load_immediate(this.x)
 			break
+		case Opcode.LOAD_Y_ZERO_PAGE:
+			this._load_zero_page(this.y)
+			break
 		case Opcode.LOAD_ACCUMULATOR_ZERO_PAGE:
-			this._load_from_address(this.accumulator, this._zero_page_address())
+			this._load_zero_page(this.accumulator)
 			break
 		case Opcode.TRANSFER_ACCUMULATOR_TO_Y:
 			this._transfer(this.accumulator, this.y)
@@ -169,6 +172,11 @@ export class Processor {
 
 	_load_immediate(register: Register) {
 		register.set(this._next())
+	}
+
+	_load_zero_page(register: Register) {
+		const address = this._zero_page_address()
+		this._load_from_address(register, address)
 	}
 
 	_load_from_address(register: Register, address: number) {
