@@ -150,7 +150,8 @@ function _get_units(line: Line, state: State) {
 	}
 	if (first_word === "CMP") {
 		return _addressed(line, state, {
-			immediate: Opcode.COMPARE_IMMEDIATE})
+			immediate: Opcode.COMPARE_IMMEDIATE,
+			indirect_y_indexed: Opcode.COMPARE_INDIRECT_Y_INDEXED})
 	}
 	if (first_word === "CPX") {
 		return _addressed(line, state, {

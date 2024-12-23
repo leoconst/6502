@@ -100,6 +100,9 @@ export class Processor {
 		case Opcode.BRANCH_IF_NOT_EQUAL:
 			this._branch_if(!this.status.zero)
 			break
+		case Opcode.COMPARE_INDIRECT_Y_INDEXED:
+			this._compare(this.accumulator, this._indirect_y_indexed_address())
+			break
 		case Opcode.COMPARE_X_IMMEDIATE:
 			this._compare_immediate(this.x)
 			break
@@ -144,8 +147,13 @@ export class Processor {
 	}
 
 	_compare_immediate(register: Register) {
+		const value = this._next()
+		this._compare(register, value)
+	}
+
+	_compare(register: Register, value: number) {
 		// TODO: Set all relevant status flags
-		this.status.zero = register.getValue() == this._next()
+		this.status.zero = register.getValue() == value
 	}
 
 	_from_twos_compliment(value: number) {
