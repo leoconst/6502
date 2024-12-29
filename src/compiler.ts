@@ -144,6 +144,10 @@ function _get_units(line: Line, state: State) {
 			zero_page: Opcode.STORE_ACCUMULATOR_ZERO_PAGE,
 			indirect_y_indexed: Opcode.STORE_ACCUMULATOR_INDIRECT_Y_INDEXED})
 	}
+	if (first_word === "STX") {
+		return _addressed(line, state, {
+			zero_page: Opcode.STORE_X_ZERO_PAGE})
+	}
 	if (first_word === "ADC") {
 		return _addressed(line, state, {
 			immediate: Opcode.ADD_WITH_CARRY_IMMEDIATE})

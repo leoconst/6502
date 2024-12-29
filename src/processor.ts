@@ -55,6 +55,9 @@ export class Processor {
 		case Opcode.STORE_ACCUMULATOR_ZERO_PAGE:
 			this._store(this.accumulator, this._zero_page_address())
 			break
+		case Opcode.STORE_X_ZERO_PAGE:
+			this._store(this.x, this._zero_page_address())
+			break
 		case Opcode.DECREMENT_Y:
 			this._decrement_register(this.y)
 			break
