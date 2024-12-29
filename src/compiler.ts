@@ -153,6 +153,10 @@ function _get_units(line: Line, state: State) {
 			immediate: Opcode.COMPARE_IMMEDIATE,
 			indirect_y_indexed: Opcode.COMPARE_INDIRECT_Y_INDEXED})
 	}
+	if (first_word === "CPY") {
+		return _addressed(line, state, {
+			immediate: Opcode.COMPARE_Y_IMMEDIATE})
+	}
 	if (first_word === "CPX") {
 		return _addressed(line, state, {
 			immediate: Opcode.COMPARE_X_IMMEDIATE})
@@ -201,7 +205,7 @@ function _get_label_address(name: string, state: State) {
 		throw Error(`Label '${name}' not present`)
 	}
 
-	return address 
+	return address
 }
 
 function _addressed(line: Line, state: State, opcodes: AddressingOpcodes = {}) {

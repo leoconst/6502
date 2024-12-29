@@ -88,6 +88,9 @@ export class Processor {
 		case Opcode.LOAD_ACCUMULATOR_IMMEDIATE:
 			this._load_immediate(this.accumulator)
 			break
+		case Opcode.COMPARE_Y_IMMEDIATE:
+			this._compare_immediate(this.y)
+			break
 		case Opcode.DECREMENT_ZERO_PAGE:
 			this._decrement_memory(this._zero_page_address())
 			break
