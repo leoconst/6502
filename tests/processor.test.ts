@@ -97,7 +97,7 @@ function _run_program(processor: Processor, expected_advance_count: number = 1) 
     expect(advance_count).toBe(expected_advance_count)
 }
 
-function _expect_state(processor: Processor, state: _ProcessorState) {
+function _expect_state(processor: Processor, state: Partial<_ProcessorState>) {
     const expected = {..._default_state, ...state}
     const actual = {
         accumulator: processor.accumulator.getValue(),
@@ -117,8 +117,8 @@ const _default_state: _ProcessorState = {
 }
 
 interface _ProcessorState {
-    accumulator?: number,
-    zero?: boolean,
-    negative?: boolean,
-    carry?: boolean,
+    accumulator: number,
+    zero: boolean,
+    negative: boolean,
+    carry: boolean,
 }
