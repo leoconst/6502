@@ -75,7 +75,9 @@ describe('Processor', () => {
         program: [
             Opcode.LOAD_ACCUMULATOR_ZERO_PAGE, 4,
         ],
-        memory: [0, 0, 0, 0, 123],
+        state: {
+            memory: [4, [123]],
+        },
         expectations: {
             accumulator: 123,
         }
@@ -92,7 +94,9 @@ describe('Processor', () => {
         program: [
             Opcode.LOAD_ACCUMULATOR_ZERO_PAGE, 1,
         ],
-        memory: [0, -45],
+        state: {
+            memory: [1, [-45]],
+        },
         expectations: {
             accumulator: 0x100 - 45,
             negative: true,
@@ -118,7 +122,7 @@ function _set_up_processor(setup: Partial<_Setup>) {
     const processor = new Processor()
 
     _set_start_state(processor, setup.state)
-    _set_memory(processor, setup.memory)
+    _set_memory(processor, setup.state?.memory)
 
     const program = new Uint8Array(complete_start_state.program)
     processor.load_program(program, complete_start_state.program_start)
@@ -126,10 +130,11 @@ function _set_up_processor(setup: Partial<_Setup>) {
     return processor
 }
 
-function _set_memory(processor: Processor, memory: number[] | undefined) {
+function _set_memory(processor: Processor, memory: _Memory | undefined) {
     if (memory !== undefined) {
-        for (var index = 0; index < memory.length; ++index) {
-            processor.memory[index] = memory[index]
+        const [start_index, values] = memory
+        for (var index = 0; index < values.length; ++index) {
+            processor.memory[start_index + index] = values[index]
         }
     }
 }
@@ -164,7 +169,6 @@ const _default_setup: _Setup = {
 interface _Setup {
     program: number[],
     program_start: number,
-    memory?: number[],
     state: Partial<_State>,
 }
 
@@ -210,4 +214,7 @@ interface _State {
     zero: boolean,
     negative: boolean,
     carry: boolean,
+    memory?: _Memory,
 }
+
+type _Memory = [number, number[]]
