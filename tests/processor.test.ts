@@ -34,72 +34,158 @@ describe('Processor', () => {
         expect(processor.memory).toStrictEqual(new Uint8Array(0x10000))
     })
     describe.each([true, false])('when the carry flag = %p', (carry) => {
-        test('Clear Carry clears the carry flag', () => {
-            const processor = _programmed_processor(Opcode.CLEAR_CARRY)
-            processor.status.carry = carry
-
-            _run_program(processor)
-
-            _expect_state(processor, {
-                carry: false
-            })
+        _test_processor('Clear Carry clears the carry flag', {
+            program: [
+                Opcode.CLEAR_CARRY,
+            ],
+            state: {
+                carry,
+            },
+            expectations: {
+                carry: false,
+            }
         })
     })
-    test('load accumulator immediate positive', () => {
-        const processor = _programmed_processor(
+    _test_processor('load accumulator (immediate) positive', {
+        program: [
             Opcode.LOAD_ACCUMULATOR_IMMEDIATE, 3,
-        )
-
-        _run_program(processor)
-
-        _expect_state(processor, {
+        ],
+        expectations: {
             accumulator: 3,
-        })
+        }
     })
-    test('load accumulator immediate zero', () => {
-        const processor = _programmed_processor(
+    _test_processor('load accumulator (immediate) zero', {
+        program: [
             Opcode.LOAD_ACCUMULATOR_IMMEDIATE, 0,
-        )
-
-        _run_program(processor)
-
-        _expect_state(processor, {
+        ],
+        expectations: {
             zero: true,
-        })
+        }
     })
-    test('load accumulator immediate negative', () => {
-        const processor = _programmed_processor(
+    _test_processor('load accumulator (immediate) negative', {
+        program: [
             Opcode.LOAD_ACCUMULATOR_IMMEDIATE, -4,
-        )
-
-        _run_program(processor)
-
-        _expect_state(processor, {
+        ],
+        expectations: {
             accumulator: 0x100 - 4,
             negative: true,
-        })
+        }
+    })
+    _test_processor('load accumulator (zero page) positive', {
+        program: [
+            Opcode.LOAD_ACCUMULATOR_ZERO_PAGE, 4,
+        ],
+        memory: [0, 0, 0, 0, 123],
+        expectations: {
+            accumulator: 123,
+        }
+    })
+    _test_processor('load accumulator (zero page) zero', {
+        program: [
+            Opcode.LOAD_ACCUMULATOR_ZERO_PAGE, 234,
+        ],
+        expectations: {
+            zero: true,
+        }
+    })
+    _test_processor('load accumulator (zero page) negative', {
+        program: [
+            Opcode.LOAD_ACCUMULATOR_ZERO_PAGE, 1,
+        ],
+        memory: [0, -45],
+        expectations: {
+            accumulator: 0x100 - 45,
+            negative: true,
+        }
     })
 })
 
-function _programmed_processor(...program: number[]) {
+function _test_processor(description: string, arguments_: _TestArguments) {
+    test(description, () => {
+        const processor = _set_up_processor(arguments_)
+
+        const advance_count = _run_program(processor)
+
+        _check_expectations(processor, advance_count, arguments_.expectations)
+    })
+}
+
+type _TestArguments = Partial<_Setup> & { expectations: Partial<_Expectations> }
+
+function _set_up_processor(setup: Partial<_Setup>) {
+    const complete_start_state = {..._default_setup, ...setup}
+
     const processor = new Processor()
-    processor.load_program(new Uint8Array(program), 0x0600)
+
+    _set_start_state(processor, setup.state)
+    _set_memory(processor, setup.memory)
+
+    const program = new Uint8Array(complete_start_state.program)
+    processor.load_program(program, complete_start_state.program_start)
+
     return processor
 }
 
-function _run_program(processor: Processor, expected_advance_count: number = 1) {
+function _set_memory(processor: Processor, memory: number[] | undefined) {
+    if (memory !== undefined) {
+        for (var index = 0; index < memory.length; ++index) {
+            processor.memory[index] = memory[index]
+        }
+    }
+}
+
+function _set_start_state(processor: Processor, setup: Partial<_State>) {
+    _set_start_state_property(
+        setup?.accumulator,
+        accumulator => processor.accumulator._value = accumulator)
+    _set_start_state_property(
+        setup?.zero,
+        zero => processor.status.zero = zero)
+    _set_start_state_property(
+        setup?.negative,
+        negative => processor.status.negative = negative)
+    _set_start_state_property(
+        setup?.carry,
+        carry => processor.status.carry = carry)
+}
+
+function _set_start_state_property<T>(property: T | undefined, set: (value: T) => void) {
+    if (property !== undefined) {
+        set(property)
+    }
+}
+
+const _default_setup: _Setup = {
+    program: [],
+    program_start: 0x0200,
+    state: {}
+}
+
+interface _Setup {
+    program: number[],
+    program_start: number,
+    memory?: number[],
+    state: Partial<_State>,
+}
+
+function _run_program(processor: Processor) {
     var advance_count = 0
 
     while (processor.advance()) {
         ++advance_count
     }
 
-    expect(advance_count).toBe(expected_advance_count)
+    return advance_count
 }
 
-function _expect_state(processor: Processor, state: Partial<_ProcessorState>) {
-    const expected = {..._default_state, ...state}
+function _check_expectations(
+    processor: Processor,
+    advance_count: number,
+    expectations: Partial<_Expectations>)
+{
+    const expected = {..._default_expectations, ...expectations}
     const actual = {
+        advance_count,
         accumulator: processor.accumulator.getValue(),
         zero: processor.status.zero,
         negative: processor.status.negative,
@@ -109,14 +195,17 @@ function _expect_state(processor: Processor, state: Partial<_ProcessorState>) {
     expect(actual).toStrictEqual(expected)
 }
 
-const _default_state: _ProcessorState = {
+const _default_expectations: _Expectations = {
+    advance_count: 1,
     accumulator: 0,
     zero: false,
     negative: false,
     carry: false,
 }
 
-interface _ProcessorState {
+type _Expectations = _State & { advance_count: number }
+
+interface _State {
     accumulator: number,
     zero: boolean,
     negative: boolean,
