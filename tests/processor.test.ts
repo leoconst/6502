@@ -102,41 +102,55 @@ describe('Processor', () => {
             negative: true,
         }
     })
+    _test_processor('store accumulator (zero page)', {
+        program: [
+            Opcode.STORE_ACCUMULATOR_ZERO_PAGE, 0xA3,
+        ],
+        state: {
+            accumulator: 107,
+        },
+        expectations: {
+            memory: [0xA3, [107]],
+        }
+    })
+    _test_processor('store accumulator (absolute)', {
+        program: [
+            Opcode.STORE_ACCUMULATOR_ABSOLUTE, 0x51, 0xF4,
+        ],
+        state: {
+            accumulator: 234,
+        },
+        expectations: {
+            memory: [0xF4_51, [234]],
+        }
+    })
 })
 
 function _test_processor(description: string, arguments_: _TestArguments) {
     test(description, () => {
-        const processor = _set_up_processor(arguments_)
+        const setup = {..._default_setup, ...arguments_}
+        const expectations = {..._default_expectations, ...arguments_.state, ...arguments_.expectations}
+
+        const processor = _set_up_processor(setup)
 
         const advance_count = _run_program(processor)
 
-        _check_expectations(processor, advance_count, arguments_.expectations)
+        _check_expectations(processor, advance_count, setup, expectations)
     })
 }
 
 type _TestArguments = Partial<_Setup> & { expectations: Partial<_Expectations> }
 
-function _set_up_processor(setup: Partial<_Setup>) {
-    const complete_start_state = {..._default_setup, ...setup}
-
+function _set_up_processor(setup: _Setup) {
     const processor = new Processor()
 
     _set_start_state(processor, setup.state)
-    _set_memory(processor, setup.state?.memory)
+    _patch_memory(processor.memory, setup.state.memory)
 
-    const program = new Uint8Array(complete_start_state.program)
-    processor.load_program(program, complete_start_state.program_start)
+    const program = new Uint8Array(setup.program)
+    processor.load_program(program, setup.program_start)
 
     return processor
-}
-
-function _set_memory(processor: Processor, memory: _Memory | undefined) {
-    if (memory !== undefined) {
-        const [start_index, values] = memory
-        for (var index = 0; index < values.length; ++index) {
-            processor.memory[start_index + index] = values[index]
-        }
-    }
 }
 
 function _set_start_state(processor: Processor, setup: Partial<_State>) {
@@ -185,18 +199,40 @@ function _run_program(processor: Processor) {
 function _check_expectations(
     processor: Processor,
     advance_count: number,
-    expectations: Partial<_Expectations>)
+    setup: _Setup,
+    expectations: _Expectations)
 {
-    const expected = {..._default_expectations, ...expectations}
+    const memory = _expected_memory(setup, expectations)
+
+    const expected = {...setup.state, ...expectations, memory}
     const actual = {
         advance_count,
         accumulator: processor.accumulator.getValue(),
         zero: processor.status.zero,
         negative: processor.status.negative,
         carry: processor.status.carry,
+        memory: processor.memory,
     }
 
     expect(actual).toStrictEqual(expected)
+}
+
+function _expected_memory(setup: _Setup, expectations: _Expectations) {
+    const memory = new Uint8Array(0x1_00_00)
+
+    _patch_memory(memory, setup.state.memory)
+    _patch_memory(memory, expectations.memory)
+
+    memory.set(setup.program, setup.program_start)
+
+    return memory
+}
+
+function _patch_memory(memory: Uint8Array, overlay: _Memory) {
+    if (overlay !== undefined) {
+        const [start_index, values] = overlay
+        memory.set(values, start_index)
+    }
 }
 
 const _default_expectations: _Expectations = {
