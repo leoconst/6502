@@ -39,7 +39,80 @@ describe('Processor', () => {
     test('clear carry from unset', () => {
         _test_clear_carry(false)
     })
+    test('load accumulator immediate positive', () => {
+        const processor = _programmed_processor(
+            Opcode.LOAD_ACCUMULATOR_IMMEDIATE, 3,
+        )
+
+        _run_program(processor)
+
+        _expect_state(processor, {
+            accumulator: 3,
+        })
+    })
+    test('load accumulator immediate zero', () => {
+        const processor = _programmed_processor(
+            Opcode.LOAD_ACCUMULATOR_IMMEDIATE, 0,
+        )
+
+        _run_program(processor)
+
+        _expect_state(processor, {
+            zero: true,
+        })
+    })
+    test('load accumulator immediate negative', () => {
+        const processor = _programmed_processor(
+            Opcode.LOAD_ACCUMULATOR_IMMEDIATE, -4,
+        )
+
+        _run_program(processor)
+
+        _expect_state(processor, {
+            accumulator: 0x100 - 4,
+            negative: true,
+        })
+    })
 })
+
+function _programmed_processor(...program: number[]) {
+    const processor = new Processor()
+    processor.load_program(new Uint8Array(program), 0x0600)
+    return processor
+}
+
+function _run_program(processor: Processor, expected_advance_count: number = 1) {
+    var advance_count = 0
+
+    while (processor.advance()) {
+        ++advance_count
+    }
+
+    expect(advance_count).toBe(expected_advance_count)
+}
+
+function _expect_state(processor: Processor, state: _ProcessorState) {
+    const expected = {..._default_state, ...state}
+    const actual = {
+        accumulator: processor.accumulator.getValue(),
+        zero: processor.status.zero,
+        negative: processor.status.negative,
+    }
+
+    expect(actual).toStrictEqual(expected)
+}
+
+const _default_state: _ProcessorState = {
+    accumulator: 0,
+    zero: false,
+    negative: false,
+}
+
+interface _ProcessorState {
+    accumulator?: number,
+    zero?: boolean,
+    negative?: boolean,
+}
 
 function _test_clear_carry(carry: boolean) {
     const processor = new Processor()
