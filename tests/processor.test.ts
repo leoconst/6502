@@ -33,11 +33,17 @@ describe('Processor', () => {
         expect(proceed).toBe(false)
         expect(processor.memory).toStrictEqual(new Uint8Array(0x10000))
     })
-    test('clear carry from set', () => {
-        _test_clear_carry(true)
-    })
-    test('clear carry from unset', () => {
-        _test_clear_carry(false)
+    describe.each([true, false])('when the carry flag = %p', (carry) => {
+        test('Clear Carry clears the carry flag', () => {
+            const processor = _programmed_processor(Opcode.CLEAR_CARRY)
+            processor.status.carry = carry
+
+            _run_program(processor)
+
+            _expect_state(processor, {
+                carry: false
+            })
+        })
     })
     test('load accumulator immediate positive', () => {
         const processor = _programmed_processor(
@@ -97,6 +103,7 @@ function _expect_state(processor: Processor, state: _ProcessorState) {
         accumulator: processor.accumulator.getValue(),
         zero: processor.status.zero,
         negative: processor.status.negative,
+        carry: processor.status.carry,
     }
 
     expect(actual).toStrictEqual(expected)
@@ -106,22 +113,12 @@ const _default_state: _ProcessorState = {
     accumulator: 0,
     zero: false,
     negative: false,
+    carry: false,
 }
 
 interface _ProcessorState {
     accumulator?: number,
     zero?: boolean,
     negative?: boolean,
-}
-
-function _test_clear_carry(carry: boolean) {
-    const processor = new Processor()
-    processor.status.carry = carry
-    const program = new Uint8Array([Opcode.CLEAR_CARRY])
-    processor.load_program(program, 0x06_00)
-
-    const proceed = processor.advance()
-
-    expect(proceed).toBe(true)
-    expect(processor.status.carry).toBe(false)
+    carry?: boolean,
 }
