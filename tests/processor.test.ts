@@ -124,6 +124,12 @@ describe('Processor', () => {
             memory: [0xF4_51, [234]],
         }
     })
+    _test_processor('no operation', {
+        program: [
+            Opcode.NO_OPERATION,
+        ],
+        expectations: {}
+    })
 })
 
 function _test_processor(description: string, arguments_: _TestArguments) {
